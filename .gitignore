@@ -1,0 +1,5 @@
+# Build
+com/craftinginterpreters/lox
+
+# Editor
+.vscode
