@@ -1,4 +1,4 @@
-objects = lox/Lox.java lox/Scanner.java lox/Token.java lox/TokenType.java lox/Expr.java
+objects = lox/Lox.java lox/Scanner.java lox/Token.java lox/TokenType.java lox/Expr.java lox/Parser.java
 
 run : $(objects)
 	javac -d . $(objects)

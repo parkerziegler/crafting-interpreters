@@ -1,5 +1,6 @@
 package com.craftinginterpreters.lox;
 
+import java.beans.Expression;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -28,7 +29,8 @@ public class Lox {
     run(new String(bytes, Charset.defaultCharset()));
 
     // If we encounter an error, indicate it with exit code.
-    if (hadError) System.exit(65);
+    if (hadError)
+      System.exit(65);
   }
 
   // Execute lox code interactively, as you would in a REPL.
@@ -41,7 +43,8 @@ public class Lox {
       String line = reader.readLine();
       // readLine will return null when encountering a Ctrl-D EOF condition.
       // Handle this case and break out of the loop.
-      if (line == null) break;
+      if (line == null)
+        break;
       run(line);
 
       // Reset errors when running code interactively.
@@ -52,10 +55,15 @@ public class Lox {
   private static void run(String source) {
     Scanner scanner = new Scanner(source);
     List<Token> tokens = scanner.scanTokens();
+    Parser parser = new Parser(tokens);
+    Expr expression = parser.parse();
 
-    for (Token token : tokens) {
-      System.out.println(token);
+    // Stop if we encountered a syntax error.
+    if (hadError) {
+      return;
     }
+
+    System.out.println(new AstPrinter().print(expression));
   }
 
   static void error(int line, String message) {
@@ -64,8 +72,15 @@ public class Lox {
 
   private static void report(int line, String where, String message) {
     System.err.println(
-      "[line " + line + "] Error" + where + ": " + message
-    );
+        "[line " + line + "] Error" + where + ": " + message);
     hadError = true;
+  }
+
+  static void error(Token token, String message) {
+    if (token.type == TokenType.EOF) {
+      report(token.line, " at end", message);
+    } else {
+      report(token.line, "at '" + token.lexeme + "'", message);
+    }
   }
 }
