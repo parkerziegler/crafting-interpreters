@@ -10,7 +10,11 @@ import java.nio.file.Paths;
 import java.util.List;
 
 public class Lox {
+  // We make the interpreter field static such that successive calls to run
+  // inside of a REPL session reuse the same interpreter instance.
+  private static final Interpreter interpreter = new Interpreter();
   static boolean hadError = false;
+  static boolean hadRuntimeError = false;
 
   public static void main(String[] args) throws IOException {
     if (args.length > 1) {
@@ -28,9 +32,15 @@ public class Lox {
     byte[] bytes = Files.readAllBytes(Paths.get(path));
     run(new String(bytes, Charset.defaultCharset()));
 
-    // If we encounter an error, indicate it with exit code.
-    if (hadError)
+    // If we encounter a syntax error, indicate it with exit code.
+    if (hadError) {
       System.exit(65);
+    }
+
+    // If we encounter a runtime error, indicate it with exit code.
+    if (hadRuntimeError) {
+      System.exit(70);
+    }
   }
 
   // Execute lox code interactively, as you would in a REPL.
@@ -63,11 +73,18 @@ public class Lox {
       return;
     }
 
-    System.out.println(new AstPrinter().print(expression));
+    // To see the pretty-printed AST of the expression, uncomment this line.
+    // System.out.println(new AstPrinter().print(expression));
+    interpreter.interpret(expression);
   }
 
   static void error(int line, String message) {
     report(line, "", message);
+  }
+
+  static void runtimeError(RuntimeError error) {
+    System.err.println(error.getMessage() + "\n[line " + error.token.line + "]");
+    hadRuntimeError = true;
   }
 
   private static void report(int line, String where, String message) {
