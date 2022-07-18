@@ -26,12 +26,7 @@ class Parser {
     return statements;
   }
 
-  // expression → equality ;
-  private Expr expression() {
-    return equality();
-  }
-
-  // statement → exprStmt | printStmt
+  // statement → exprStmt | printStmt;
   private Stmt statement() {
     if (match(PRINT)) {
       return printStatement();
@@ -40,8 +35,11 @@ class Parser {
     return expressionStatement();
   }
 
+  // declaration → varDecl | statement;
   private Stmt declaration() {
     try {
+      // Check if we're declaring a variable.
+      // If not, fall through to another statement type.
       if (match(VAR)) {
         return varDeclaration();
       }
@@ -72,7 +70,7 @@ class Parser {
 
   // varDecl → "var" IDENTIFIER ( "=" expression )? ";";
   private Stmt varDeclaration() {
-    Token name = consume(VAR, "Expect variable name.");
+    Token name = consume(IDENTIFIER, "Expect variable name.");
 
     Expr initializer = null;
     if (match(EQUAL)) {
@@ -83,7 +81,37 @@ class Parser {
     return new Stmt.Var(name, initializer);
   }
 
-  // equality → comparison ( ( "!=" | "==" ) comparison )* ;
+  // expression → assignment;
+  private Expr expression() {
+    return assignment();
+  }
+
+  // assignment → IDENTIFIER "=" assignment | equality;
+  private Expr assignment() {
+    Expr expr = equality();
+
+    if (match(EQUAL)) {
+      Token equals = previous();
+      // Assignment is right-associative, so we recursively call assignment
+      // to ensure we've executed rightmost assignment expressions first.
+      Expr value = assignment();
+
+      // Look at the LHS of the assignment expression and ensure we're working with an
+      // assignment target, Expr.Variable. Every valid assignment target is itself
+      // just an expression (e.g. consider newPoint(x + 2, 0).y = 3, where the LHS is
+      // itself an expression).
+      if (expr instanceof Expr.Variable) {
+        Token name = ((Expr.Variable) expr).name;
+        return new Expr.Assign(name, value);
+      }
+
+      error(equals, "Invalid assignment target.");
+    }
+
+    return expr;
+  }
+
+  // equality → comparison ( ( "!=" | "==" ) comparison )*;
   private Expr equality() {
     // Left comparison non-terminal call.
     Expr expr = comparison();
@@ -150,7 +178,7 @@ class Parser {
   }
 
   // primary → NUMBER | STRING | "true" | "false" | "nil"
-  // | "(" expression ")" ;
+  // | "(" expression ")" | IDENTIFIER;
   private Expr primary() {
     if (match(FALSE)) {
       return new Expr.Literal(false);
