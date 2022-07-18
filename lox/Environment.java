@@ -4,7 +4,18 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class Environment {
+  final Environment enclosing;
   private final Map<String, Object> values = new HashMap<>();
+
+  // no-argument constructor for the global scope.
+  Environment() {
+    enclosing = null;
+  }
+
+  // argument constructor for the local scope.
+  Environment(Environment enclosing) {
+    this.enclosing = enclosing;
+  }
 
   // Variable definition — bind a variable name to a particular value.
   // Note that variable definition does not check to see if a variable
@@ -20,6 +31,11 @@ public class Environment {
       return values.get(name.lexeme);
     }
 
+    // Lookup the variable name in enclosing scopes.
+    if (enclosing != null) {
+      return enclosing.get(name);
+    }
+
     // Throw a RuntimeError on undefined variables. We want to allow programs
     // to refer to variables without immediately evaluating those variables; this
     // is especially helpful for recursive and mutually recursive functions.
@@ -28,7 +44,15 @@ public class Environment {
 
   void assign(Token name, Object value) {
     if (values.containsKey(name)) {
-      values.put(name, value);
+      values.put(name.lexeme, value);
+      return;
+    }
+
+    // If the variable being assigned to isn't in this environment,
+    // check enclosing environments.
+    if (enclosing != null) {
+      enclosing.assign(name, value);
+
       return;
     }
 
