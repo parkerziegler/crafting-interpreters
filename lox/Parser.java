@@ -1,6 +1,7 @@
 package com.craftinginterpreters.lox;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static com.craftinginterpreters.lox.TokenType.*;
@@ -26,8 +27,12 @@ class Parser {
     return statements;
   }
 
-  // statement → exprStmt | ifStmt | printStmt | whileStmt | block;
+  // statement → exprStmt | forStmt | ifStmt | printStmt | whileStmt | block;
   private Stmt statement() {
+    if (match(FOR)) {
+      return forStatement();
+    }
+
     if (match(IF)) {
       return ifStatement();
     }
@@ -70,6 +75,56 @@ class Parser {
     consume(SEMICOLON, "Expect ';' after expression.");
 
     return new Stmt.Expression(expr);
+  }
+
+  // forStmt → "for" "(" varDecl | exprStmt | ";" )
+  // expression? ";" expression ")" statement;
+  private Stmt forStatement() {
+    consume(LEFT_PAREN, "Expect '(' after 'for'.");
+
+    Stmt initializer;
+    if (match(SEMICOLON)) {
+      initializer = null;
+    } else if (match(VAR)) {
+      initializer = varDeclaration();
+    } else {
+      initializer = expressionStatement();
+    }
+
+    Expr condition = null;
+    if (!check(SEMICOLON)) {
+      condition = expression();
+    }
+    consume(SEMICOLON, "Expect ';' after loop condition.");
+
+    Expr increment = null;
+    if (!check(RIGHT_PAREN)) {
+      increment = expression();
+    }
+    consume(RIGHT_PAREN, "Expect ')' after for clauses.");
+
+    Stmt body = statement();
+
+    // Begin desugaring to while loop.
+    // Append loop increment to end of loop body.
+    if (increment != null) {
+      body = new Stmt.Block(Arrays.asList(body, new Stmt.Expression(increment)));
+    }
+
+    // If there is no condition expression, assume true.
+    if (condition == null) {
+      condition = new Expr.Literal(true);
+    }
+
+    // Create a new while AST node.
+    body = new Stmt.While(condition, body);
+
+    // Prepend variable initialization, running it once before the while loop.
+    if (initializer != null) {
+      body = new Stmt.Block(Arrays.asList(initializer, body));
+    }
+
+    return body;
   }
 
   // ifStmt → "if" "(" expression ")" statement ( "else" statement )?;

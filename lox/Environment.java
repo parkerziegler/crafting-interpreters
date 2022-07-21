@@ -43,7 +43,7 @@ public class Environment {
   }
 
   void assign(Token name, Object value) {
-    if (values.containsKey(name)) {
+    if (values.containsKey(name.lexeme)) {
       values.put(name.lexeme, value);
       return;
     }
@@ -52,9 +52,10 @@ public class Environment {
     // check enclosing environments.
     if (enclosing != null) {
       enclosing.assign(name, value);
-
       return;
     }
+
+    System.out.println("About to throw in assign.");
 
     // Throw an error if we attempt to assign to an undefined variable.
     throw new RuntimeError(name, "Undefined variable '" + name.lexeme + "'.");
