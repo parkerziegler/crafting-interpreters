@@ -1,5 +1,6 @@
 package com.craftinginterpreters.lox;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import com.craftinginterpreters.lox.Environment;
@@ -102,66 +103,6 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   }
 
   @Override
-  public Object visitVariableExpr(Expr.Variable expr) {
-    return environment.get(expr.name);
-  }
-
-  @Override
-  public Object visitLiteralExpr(Expr.Literal expr) {
-    return expr.value;
-  }
-
-  @Override
-  public Object visitLogicalExpr(Expr.Logical expr) {
-    Object left = evaluate(expr.left);
-
-    if (expr.operator.type == TokenType.OR) {
-      if (isTruthy(left)) {
-        return left;
-      }
-    } else {
-      if (!isTruthy(left)) {
-        return left;
-      }
-    }
-
-    return evaluate(expr.right);
-  }
-
-  @Override
-  public Object visitGroupingExpr(Expr.Grouping expr) {
-    return evaluate(expr.expression);
-  }
-
-  @Override
-  public Object visitUnaryExpr(Expr.Unary expr) {
-    // Evaluate the operand first. Since we evaluate the operand subexpression
-    // before the unary expression, this is a post-order traversal. We do the
-    // "work" of evaluating subexpressions before the current expression.
-    Object right = evaluate(expr.right);
-
-    // Apply the unary operator to the result of evaluating the operand.
-    switch (expr.operator.type) {
-      case BANG:
-        return !isTruthy(right);
-      case MINUS:
-        checkNumberOperand(expr.operator, right);
-        return -(double) right;
-    }
-
-    // Unreachable.
-    return null;
-  }
-
-  private void checkNumberOperand(Token operator, Object operand) {
-    if (operand instanceof Double) {
-      return;
-    }
-
-    throw new RuntimeError(operator, "Operand must be a number.");
-  }
-
-  @Override
   public Object visitBinaryExpr(Expr.Binary expr) {
     Object left = evaluate(expr.left);
     Object right = evaluate(expr.right);
@@ -207,6 +148,90 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
     // Unreachable.
     return null;
+  }
+
+  @Override
+  public Object visitCallExpr(Expr.Call expr) {
+    Object callee = evaluate(expr.callee);
+
+    List<Object> arguments = new ArrayList<>();
+    for (Expr argument : expr.arguments) {
+      arguments.add(evaluate(argument));
+    }
+
+    // Ensure the callee implements LoxCallable so that we don't invoke
+    // non-callable expressions like strings.
+    if (!(callee instanceof LoxCallable)) {
+      throw new RuntimeError(expr.paren, "Can only call functions and classes.");
+    }
+
+    LoxCallable function = (LoxCallable) callee;
+    if (arguments.size() != function.arity()) {
+      throw new RuntimeError(expr.paren,
+          "Expected " + function.arity() + " arguments but got " + arguments.size() + ".");
+    }
+
+    return function.call(this, arguments);
+  }
+
+  @Override
+  public Object visitGroupingExpr(Expr.Grouping expr) {
+    return evaluate(expr.expression);
+  }
+
+  @Override
+  public Object visitLiteralExpr(Expr.Literal expr) {
+    return expr.value;
+  }
+
+  @Override
+  public Object visitLogicalExpr(Expr.Logical expr) {
+    Object left = evaluate(expr.left);
+
+    if (expr.operator.type == TokenType.OR) {
+      if (isTruthy(left)) {
+        return left;
+      }
+    } else {
+      if (!isTruthy(left)) {
+        return left;
+      }
+    }
+
+    return evaluate(expr.right);
+  }
+
+  @Override
+  public Object visitUnaryExpr(Expr.Unary expr) {
+    // Evaluate the operand first. Since we evaluate the operand subexpression
+    // before the unary expression, this is a post-order traversal. We do the
+    // "work" of evaluating subexpressions before the current expression.
+    Object right = evaluate(expr.right);
+
+    // Apply the unary operator to the result of evaluating the operand.
+    switch (expr.operator.type) {
+      case BANG:
+        return !isTruthy(right);
+      case MINUS:
+        checkNumberOperand(expr.operator, right);
+        return -(double) right;
+    }
+
+    // Unreachable.
+    return null;
+  }
+
+  @Override
+  public Object visitVariableExpr(Expr.Variable expr) {
+    return environment.get(expr.name);
+  }
+
+  private void checkNumberOperand(Token operator, Object operand) {
+    if (operand instanceof Double) {
+      return;
+    }
+
+    throw new RuntimeError(operator, "Operand must be a number.");
   }
 
   private void checkNumberOperands(Token operator, Object left, Object right) {

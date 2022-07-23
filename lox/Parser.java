@@ -302,8 +302,7 @@ class Parser {
     return expr;
   }
 
-  // unary → ( "!" | "-" ) unary
-  // | primary ;
+  // unary → ( "!" | "-" ) unary | call;
   private Expr unary() {
     if (match(BANG, MINUS)) {
       Token operator = previous();
@@ -311,7 +310,47 @@ class Parser {
       return new Expr.Unary(operator, right);
     }
 
-    return primary();
+    return call();
+  }
+
+  // call → primary ( "(" arguments? ")" )*;
+  private Expr call() {
+    // Parse the leading primary expression (callee) of a function call.
+    Expr expr = primary();
+
+    // As long as we match a LEFT_PAREN token, finish the call by
+    // parsing the arguments.
+    while (true) {
+      if (match(LEFT_PAREN)) {
+        expr = finishCall(expr);
+      } else {
+        break;
+      }
+    }
+
+    return expr;
+  }
+
+  // arguments → expression ( "," expression )*;
+  private Expr finishCall(Expr callee) {
+    List<Expr> arguments = new ArrayList<>();
+
+    // Continue matching arguments while we encounter commas.
+    // We handle the 0-argument case by first checking if we
+    // immediately encounter a RIGHT_PAREN token.
+    if (!check(RIGHT_PAREN)) {
+      do {
+        // Report an error if we exceed the max argument size.
+        if (arguments.size() >= 255) {
+          error(peek(), "Cannot have more than 255 arguments.");
+        }
+        arguments.add(expression());
+      } while (match(COMMA));
+    }
+
+    Token paren = consume(RIGHT_PAREN, "Expect ')' after arguments.");
+
+    return new Expr.Call(callee, paren, arguments);
   }
 
   // primary → NUMBER | STRING | "true" | "false" | "nil"
