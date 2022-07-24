@@ -27,7 +27,8 @@ class Parser {
     return statements;
   }
 
-  // statement → exprStmt | forStmt | ifStmt | printStmt | whileStmt | block;
+  // statement → exprStmt | forStmt | ifStmt | printStmt
+  // | returnStmt | whileStmt | block;
   private Stmt statement() {
     if (match(FOR)) {
       return forStatement();
@@ -39,6 +40,10 @@ class Parser {
 
     if (match(PRINT)) {
       return printStatement();
+    }
+
+    if (match(RETURN)) {
+      return returnStatement();
     }
 
     if (match(WHILE)) {
@@ -180,6 +185,19 @@ class Parser {
     consume(SEMICOLON, "Expect ';' after value.");
 
     return new Stmt.Print(value);
+  }
+
+  // returnStmt → "return" expression? ";";
+  private Stmt returnStatement() {
+    Token keyword = previous();
+    Expr value = null;
+    if (!check(SEMICOLON)) {
+      value = expression();
+    }
+
+    consume(SEMICOLON, "Expect ';' after return value");
+
+    return new Stmt.Return(keyword, value);
   }
 
   // whileStmt → "while" "(" expression ")" statement;
