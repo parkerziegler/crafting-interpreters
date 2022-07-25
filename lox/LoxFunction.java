@@ -6,9 +6,14 @@ import com.craftinginterpreters.lox.Environment;
 
 class LoxFunction implements LoxCallable {
   private final Stmt.Function declaration;
+  // The closure Environment "closes over" scope at the function's
+  // declaration site. This allows us to use local functions (functions)
+  // defined in the body of other functions.
+  private final Environment closure;
 
-  LoxFunction(Stmt.Function declaration) {
+  LoxFunction(Stmt.Function declaration, Environment closure) {
     this.declaration = declaration;
+    this.closure = closure;
   }
 
   @Override
@@ -18,7 +23,7 @@ class LoxFunction implements LoxCallable {
 
   @Override
   public Object call(Interpreter interpreter, List<Object> arguments) {
-    Environment environment = new Environment(interpreter.globals);
+    Environment environment = new Environment(closure);
     for (int i = 0; i < declaration.params.size(); i++) {
       environment.define(declaration.params.get(i).lexeme, arguments.get(i));
     }
