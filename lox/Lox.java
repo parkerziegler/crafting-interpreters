@@ -73,6 +73,15 @@ public class Lox {
       return;
     }
 
+    // Run the resolver after the parser to resolve local variables.
+    Resolver resolver = new Resolver(interpreter);
+    resolver.resolve(statements);
+
+    // Stop if there was a resolution error.
+    if (hadError) {
+      return;
+    }
+
     // To see the pretty-printed AST of the expression, uncomment this line.
     // System.out.println(new AstPrinter().print(expression));
     interpreter.interpret(statements);
