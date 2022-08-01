@@ -55,7 +55,23 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
   @Override
   public Void visitClassStmt(Stmt.Class stmt) {
+    Object superclass = null;
+    if (stmt.superclass != null) {
+      superclass = evaluate(stmt.superclass);
+
+      // Validate that superclass is not a class. We don't want to
+      // allow extending from a primitive like a string literal.
+      if (!(superclass instanceof LoxClass)) {
+        throw new RuntimeError(stmt.superclass.name, "Superclass must be a class.");
+      }
+    }
+
     environment.define(stmt.name.lexeme, null);
+
+    if (superclass != null) {
+      environment = new Environment(environment);
+      environment.define("super", superclass);
+    }
 
     Map<String, LoxFunction> methods = new HashMap<>();
     for (Stmt.Function method : stmt.methods) {
@@ -65,11 +81,16 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
 
     // Transform the Class AST node into its runtime representation,
     // a LoxClass instance.
-    LoxClass klass = new LoxClass(stmt.name.lexeme, methods);
+    LoxClass klass = new LoxClass(stmt.name.lexeme, (LoxClass) superclass, methods);
+    if (superclass != null) {
+      environment = environment.enclosing;
+    }
+
     // Store the klass object in the variable defined above.
     // This will allow Lox Classes to reference klass inside
     // own methods.
     environment.assign(stmt.name, klass);
+
     return null;
   }
 
@@ -263,19 +284,6 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
   }
 
   @Override
-  public Object visitSetExpr(Expr.Set expr) {
-    Object object = evaluate(expr.object);
-
-    if (!(object instanceof LoxInstance)) {
-      throw new RuntimeError(expr.name, "Only instances have fields");
-    }
-
-    Object value = evaluate(expr.value);
-    ((LoxInstance) object).set(expr.name, value);
-    return value;
-  }
-
-  @Override
   public Object visitLiteralExpr(Expr.Literal expr) {
     return expr.value;
   }
@@ -295,6 +303,37 @@ class Interpreter implements Expr.Visitor<Object>, Stmt.Visitor<Void> {
     }
 
     return evaluate(expr.right);
+  }
+
+  @Override
+  public Object visitSetExpr(Expr.Set expr) {
+    Object object = evaluate(expr.object);
+
+    if (!(object instanceof LoxInstance)) {
+      throw new RuntimeError(expr.name, "Only instances have fields");
+    }
+
+    Object value = evaluate(expr.value);
+    ((LoxInstance) object).set(expr.name, value);
+    return value;
+  }
+
+  @Override
+  public Object visitSuperExpr(Expr.Super expr) {
+    int distance = locals.get(expr);
+    LoxClass superclass = (LoxClass) environment.getAt(distance, "super");
+
+    // The environment where "this" is bound is always right inside the
+    // environment where we store "super".
+    LoxInstance object = (LoxInstance) environment.getAt(distance - 1, "this");
+    LoxFunction method = superclass.findMethod(expr.method.lexeme);
+
+    if (method == null) {
+      throw new RuntimeError(expr.method, "Undefined property '" + expr.method.lexeme + "'.");
+    }
+
+    // Bind "this" to the method looked up in the superclass.
+    return method.bind(object);
   }
 
   @Override
